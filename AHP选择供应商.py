@@ -40,16 +40,27 @@ def consistency_check(matrix, weights):
     return CR
 
 #灵敏度测试
-def disturb_weight(origin_w,idx,scale):
+#扰动准则层权重（倍数调动）
+def disturb_weight_scale(origin_w,idx,scale):
     w_new=origin_w.copy()
     w_new[idx]=origin_w[idx]*scale
     res_sum=np.sum(w_new)-w_new[idx]
-    if res_sum>1e-8:
-        ratio=(1-w_new[idx])/res_sum
-        for i in range(len(w_new)):
-            if i !=idx:
-                w_new[i]=w_new[i]*ratio
-                return w_new
+    for i in range(len((origin_w))):
+        if i !=idx:
+            res_ratio=origin_w[i]/np.sum(origin_w)
+            w_new[i]=res_sum*res_ratio
+    return w_new
+
+#自定义调动
+def disturb_weight_figure(origin_w,idx,figure):
+    w_new=origin_w.copy()
+    w_new[idx]=figure
+    res_sum=np.sum(w_new)-w_new[idx]
+    for i in range(len((origin_w))):
+        if i !=idx:
+            res_ratio=origin_w[i]/np.sum(origin_w)
+            w_new[i]=res_sum*res_ratio
+    return w_new
 
 
 
@@ -69,9 +80,11 @@ A_criteria = np.array([
 
 print("=== 准则层权重计算 ===")
 w_criteria_geo = ahp_geometric_method(A_criteria)
+print(w_criteria_geo)
 w_criteria_sum = ahp_sum_product_method(A_criteria)
+print(w_criteria_sum)
 #各准则及对应权重
-
+#柱形图描绘
 name=['质量','成本','效率']
 import matplotlib.pyplot  as plt
 plt.rcParams["font.sans-serif"] = ["SimHei"]
@@ -177,21 +190,38 @@ best = suppliers[np.argmax(final_scores)]
 print(f"🎯 最优选择: {best}")
 
 #准则层扰动
+print('扰动后新权重')
+r_quality_weight=[]
+r_fianl_score=[]
+for x in [0.1,0.2,0.3,0.4,0.5,0.6,0.7]:
+    r_weight=disturb_weight_figure(w_criteria_geo,0,x)
+    r_quality_weight.append(r_weight[0])
+    print(r_weight)
+    #扰动后得分
+    Rfinal_scores = (r_weight[0] * w_suppliers_quality + 
+                r_weight[1] * w_suppliers_cost + 
+                r_weight[2] * w_suppliers_efficiency)
+    r_fianl_score.append(Rfinal_scores)
+r_fianl_score=np.array(r_fianl_score)
+print(f"扰动后质量权重{r_quality_weight}")
 
-scales = [0.7,0.8,0.9,1.0,1.1,1.2,1.3]
-res_A = []
-res_B = []
-for s in scales:
-     w_tmp = disturb_weight(w_criteria_geo,0,s)
-     score_tmp = consistency_check(A_criteria,w_tmp)
-     res_A.append(score_tmp[0])
-     res_B.append(score_tmp[1])
-plt.rcParams["font.sans-serif"] = ["SimHei"]
-plt.plot(scales, res_A, marker='o', label="原方案")
-plt.plot(scales, res_B, marker='s', label="扰动后方案")
-plt.xlabel("准则权重扰动系数")
-plt.ylabel("方案综合得分")
+#三家的总得分
+Ar_final_score=r_fianl_score[:,0]
+Br_final_score=r_fianl_score[:,1]
+Cr_final_score=r_fianl_score[:,2]
+#扰动后得分
+
+
+print(f'扰动后得分{r_fianl_score}')
+
+#质量权重 vs三家最终得分”的折线图
+plt.figure(figsize=(8,8))
+plt.plot(r_quality_weight,Ar_final_score,color='#0F94FA',linewidth=2,linestyle='-',marker='o',markersize=6,label='A商家')
+plt.plot(r_quality_weight,Br_final_score,color="#F40909",linewidth=2,linestyle='-',marker='o',markersize=6,label='B商家')
+plt.plot(r_quality_weight,Cr_final_score,color="#00FF22",linewidth=2,linestyle='-',marker='o',markersize=6,label='C商家')
+plt.title('质量权重 vs三家最终得分')
+plt.xlabel('质量权重')
+plt.ylabel('最终得分')
 plt.legend()
-plt.title("灵敏度分析")
-plt.grid(alpha=0.3)
-plt.show()
+#plt.grid(True,alpha=0.5)
+plt.savefig('灵敏度分析2.pdf')
